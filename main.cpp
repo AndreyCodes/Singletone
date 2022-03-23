@@ -1,56 +1,64 @@
-#include<iostream>
-
-struct SingleException: std::exception
+#include <iostream>
+#include <atomic>
+struct X
 {
-    //todo what() override
+    X() { std::cout << "X()\n"; }
+    ~X() { std::cout << "~X()\n"; }
+    void foo() { std::cout << "foo()\n"; }
 };
+ 
+ 
+#include<iostream>
+ 
 template<class Type>
 struct Single : Type
 {
     template<class... Args>
     static Single& init(Args&&... args)
     {
-        if(!inst_ptr)
-        {
+        if (!inst_ptr.load(std::memory_order_acquire))
             static Single inst(std::forward<Args>(args)...);
-        }
         else
-        {
             throw std::runtime_error("already exist");
-        }
+ 
         return *inst_ptr;
     }
     static Single& instance()
     {
-        if(inst_ptr == nullptr)
-        {
-            //throw SingleException("Instance does not exist");
+        if (!inst_ptr.load(std::memory_order_acquire))
             throw std::runtime_error("Inst does not exist");
-        }
         return *inst_ptr;
-    }   
+    }
 private:
     template<class... Args>
-    Single(Args&&... args): Type(std::forward<Args>(args)...)
+    Single(Args&&... args) : Type(std::forward<Args>(args)...)
     {
-        Single::inst_ptr = this;
+        Single::inst_ptr.store(this, std::memory_order_release);
     }
     Single& operator=(const Type&) = delete;
     Single& operator=(Type&&) = delete;
     Single(const Single&) = delete;
     Single(Single&&) = delete;
-    using Type::Type;
-    static inline Single* inst_ptr = nullptr;
+    ~Single() = default;
+    static inline std::atomic<Single*> inst_ptr = nullptr;
 };
 struct B
 {
-  void fo()
-  {
-      std::cout << "FO";
-  }  
+    void fo()
+    {
+        std::cout << "FO";
+    }
 };
 int main()
 {
-    auto& one = Single<B>::init();
-    one.fo();
+    try
+    {
+        auto& one = Single<B>::init();
+        one.fo();
+        
+    }
+    catch (std::exception& ex)
+    {
+        std::cout << ex.what();
+    }
 }
