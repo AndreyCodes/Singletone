@@ -10,7 +10,14 @@ struct Single : Type
     template<class... Args>
     static Single& init(Args&&... args)
     {
-        static Single inst(std::forward<Args>(args)...);
+        if(!inst_ptr)
+        {
+            static Single inst(std::forward<Args>(args)...);
+        }
+        else
+        {
+            throw std::runtime_error("already exist");
+        }
         return *inst_ptr;
     }
     static Single& instance()
